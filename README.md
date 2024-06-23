@@ -288,6 +288,7 @@ Table below shows the top 20 rows for average rating for each movie.
 |      1|[0, 1, 0, 0, 0, 0...|    3|
 
 only showing top 20 rows
+
 🔶 Insights: The table above shows the user with minimum rated atleast 50 movies. 
 The table also indicates the genres 0 and 1 which represent for Unkown and Action movies respectively.  
 
@@ -318,6 +319,7 @@ The table also indicates the genres 0 and 1 which represent for Unkown and Actio
 |    880| 13|     M|      student|83702|
 
 only showing top 20 rows
+
 🔶 Insights: Table above shows top 20 rows of users below the age 20 years old.
 
 ### 5) Find all the users who have the occupation “scientist” and their age is between 30 and 40 years old.
