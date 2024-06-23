@@ -221,7 +221,6 @@ Output:
 
 Table below shows the top 20 rows for average rating for each movie.
 
-|--------|------------------|
 |movie_id|    average_rating|
 |--------|------------------|
 |     471|3.6108597285067874|
@@ -244,11 +243,9 @@ Table below shows the top 20 rows for average rating for each movie.
 |     623| 2.923076923076923|
 |     737| 2.983050847457627|
 |    1483|3.4166666666666665|
-|--------|------------------|
 
 ### 2) Identify the top ten movies with the highest average ratings  
 
-|--------|--------------|
 |movie_id|average_rating|
 |--------|--------------|
 |    1599|           5.0|
@@ -261,12 +258,12 @@ Table below shows the top 20 rows for average rating for each movie.
 |    1500|           5.0|
 |    1536|           5.0|
 |     814|           5.0|
-|--------|--------------|
+
 🔶 Insights: The table above shows top 10 movies with highesr average ratings.
 
 ### 3) Find the users who have rated at least 50 movies and identify their favourite movie genres.
 
-|-------|--------------------|-----|
+
 |user_id|              genres|count|
 |-------|--------------------|-----|
 |      1|[0, 0, 0, 0, 0, 0...|   39|
@@ -289,14 +286,14 @@ Table below shows the top 20 rows for average rating for each movie.
 |      1|[0, 0, 0, 0, 0, 0...|    3|
 |      1|[0, 1, 0, 0, 0, 0...|    3|
 |      1|[0, 1, 0, 0, 0, 0...|    3|
-|-------|--------------------|-----|
+
 only showing top 20 rows
 🔶 Insights: The table above shows the user with minimum rated atleast 50 movies. 
 The table also indicates the genres 0 and 1 which represent for Unkown and Action movies respectively.  
 
 ### 4) Find all the users with age that is less than 20 years old.
 
-|-------|---|------|-------------|-----|
+
 |user_id|age|gender|   occupation|  zip|
 |-------|---|------|-------------|-----|
 |    320| 19|     M|      student|24060|
@@ -319,13 +316,13 @@ The table also indicates the genres 0 and 1 which represent for Unkown and Actio
 |    507| 18|     F|       writer|28450|
 |    262| 19|     F|      student|78264|
 |    880| 13|     M|      student|83702|
-|-------|---|------|-------------|-----|
+
 only showing top 20 rows
 🔶 Insights: Table above shows top 20 rows of users below the age 20 years old.
 
 ### 5) Find all the users who have the occupation “scientist” and their age is between 30 and 40 years old.
 
-|-------|---|------|----------|-----|
+
 |user_id|age|gender|occupation|  zip|
 |-------|---|------|----------|-----|
 |    538| 31|     M| scientist|21010|
@@ -344,7 +341,7 @@ only showing top 20 rows
 |    430| 38|     M| scientist|98199|
 |    874| 36|     M| scientist|37076|
 |    309| 40|     M| scientist|70802|
-|-------|---|------|----------|-----|
+
 
 🔶 Insights: From the dataset, the output gives us 16 scientist between the age 30 till 40 years old.
 
