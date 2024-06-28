@@ -31,7 +31,11 @@ With support for multi-datacenter replication, Cassandra is well-suited for appl
 
 ## Dataset Information
 
-* [_**'ml-100k'**_](https://files.grouplens.org/datasets/movielens/ml-100k/) contains dataset og 'u.user', 'u.data' and 'u.item' used for this project.
+* [_**'ml-100k'**_](https://files.grouplens.org/datasets/movielens/ml-100k/) contains dataset for 'u.user', 'u.data' and 'u.item' used for this project.
+* u.user contains infomation such as user_id, age, gender, occupation and zip_code.
+* u.data contains infomation such as user_id, tmovie_id, trating and ttimestamp.
+* u.item contains infomation such as movie_id, title, release_date, video_release_date, IMDb_URL, unknown, action, adventure, animation, children, comedy, crime, documentary, drama, fantasy, film_noir, horror, musical, mystery, romance, sci_fi, thriller, war and western.
+
 
 #### Load The Dataset
 
@@ -50,7 +54,7 @@ hadoop fs -copyFromLocal u.item /Name/u.item
 ```
 Once the dataset has been uploaded, we can check the at the Ambari by selecting Fileview's tab.
 
-Next in, still in PuTTY, install Cassandra by putting together the commands below:
+Next, still in PuTTY, install Cassandra by putting together the commands below:
  
 #### Install Cassandra
 
@@ -78,37 +82,51 @@ Then, we continue to create database using Cassandra Query Language (CQL).
 cqlsh
 
 -- Create the keyspace
-CREATE KEYSPACE movielens WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
-
--- Create the users table
-CREATE TABLE movielens.users (
-    user_id int PRIMARY KEY,
-    age int,
-    gender text,
-    occupation text,
-    zip text
+CREATE TABLE IF NOT EXISTS names (
+    movie_id int,
+    title text,
+    release_date text,
+    video_release_date text,
+    url text,
+    unknown int,
+    action int,
+    adventure int,
+    animation int,
+    children int,
+    comedy int,
+    crime int,
+    documentary int,
+    drama int,
+    fantasy int,
+    film_noir int,
+    horror int,
+    musical int,
+    mystery int,
+    romance int,
+    sci_fi int,
+    thriller int,
+    war int,
+    western int,
+    PRIMARY KEY (movie_id)
 );
 
 -- Create the ratings table
-CREATE TABLE movielens.ratings (
+CREATE TABLE IF NOT EXISTS ratings (
     user_id int,
     movie_id int,
     rating int,
-    timestamp bigint,
+    time int,
     PRIMARY KEY (user_id, movie_id)
 );
 
--- Create the movies table
-CREATE TABLE movielens.movies (
-    movie_id int PRIMARY KEY,
-    title text,
-    genres list<text>
-);
-
--- Create the movie names
-CREATE TABLE IF NOT EXISTS movielens.movie_names (
-    movie_id int PRIMARY KEY,
-    title text
+-- Create the users table
+CREATE TABLE IF NOT EXISTS users (
+    user_id int,
+    age int,
+    gender text,
+    occupation text,
+    zip text,
+    PRIMARY KEY (user_id)
 );
 
 exit
@@ -123,18 +141,22 @@ from pyspark.sql import SparkSession
 from pyspark.sql import Row
 from pyspark.sql import functions as F
 
-def parseUserInput(line):
+def parseInput1(line):
     fields = line.split('|')
     return Row(user_id=int(fields[0]), age=int(fields[1]), gender=fields[2], occupation=fields[3], zip=fields[4])
 
-def parseRatingInput(line):
-    fields = line.split()
-    return Row(user_id=int(fields[0]), movie_id=int(fields[1]), rating=int(fields[2]), timestamp=int(fields[3]))
+def parseInput2(line):
+    fields = line.split("\t")
+    return Row(user_id=int(fields[0]), movie_id=int(fields[1]), rating=int(fields[2]), time=int(fields[3]))
 
-def parseMovieInput(line):
-    fields = line.split('|')
-    genres = fields[5:]  # Assuming genres start from the 6th field onwards
-    return Row(movie_id=int(fields[0]), title=fields[1], genres=genres)
+def parseInput3(line):
+    fields = line.split("|")
+    return Row(movie_id=int(fields[0]), title=fields[1], release_date=fields[2], video_release_date=fields[3], url=fields[4],
+               unknown=int(fields[5]), action=int(fields[6]), adventure=int(fields[7]), animation=int(fields[8]), 
+               children=int(fields[9]), comedy=int(fields[10]), crime=int(fields[11]), documentary=int(fields[12]), 
+               drama=int(fields[13]), fantasy=int(fields[14]), film_noir=int(fields[15]), horror=int(fields[16]), 
+               musical=int(fields[17]), mystery=int(fields[18]), romance=int(fields[19]), sci_fi=int(fields[20]), 
+               thriller=int(fields[21]), war=int(fields[22]), western=int(fields[23]))
 
 if __name__ == "__main__":
     spark = SparkSession.builder \
@@ -142,155 +164,228 @@ if __name__ == "__main__":
         .config("spark.cassandra.connection.host", "127.0.0.1") \
         .getOrCreate()
 
-    # Load user data
-    user_lines = spark.sparkContext.textFile("hdfs:///user/maria_dev/wafiuddin/u.user")
-    users = user_lines.map(parseUserInput)
-    usersDataset = spark.createDataFrame(users)
-    usersDataset.write \
+    # Load the data
+    u_user = spark.sparkContext.textFile("hdfs:///user/maria_dev/wafiuddin/u.user")
+    u_data = spark.sparkContext.textFile("hdfs:///user/maria_dev/wafiuddin/u.data")
+    u_item = spark.sparkContext.textFile("hdfs:///user/maria_dev/wafiuddin/u.item")
+
+    # Create RDD objects
+    users = u_user.map(parseInput1)
+    ratings = u_data.map(parseInput2)
+    names = u_item.map(parseInput3)
+
+    # Convert into a DataFrame
+    users_df = spark.createDataFrame(users)
+    ratings_df = spark.createDataFrame(ratings)
+    names_df = spark.createDataFrame(names)
+
+    # Drop the 'time' column from ratings_df to match the Cassandra schema
+    ratings_df = ratings_df.drop("time")
+
+    # Write into Cassandra
+    users_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode('append') \
         .options(table="users", keyspace="movielens") \
         .save()
 
-    # Load rating data
-    rating_lines = spark.sparkContext.textFile("hdfs:///user/maria_dev/wafiuddin/u.data")
-    ratings = rating_lines.map(parseRatingInput)
-    ratingsDataset = spark.createDataFrame(ratings)
-    ratingsDataset.write \
+    ratings_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode('append') \
         .options(table="ratings", keyspace="movielens") \
         .save()
 
-    # Load movie data
-    movie_lines = spark.sparkContext.textFile("hdfs:///user/maria_dev/wafiuddin/u.item")
-    movies = movie_lines.map(parseMovieInput)
-    moviesDataset = spark.createDataFrame(movies)
-    moviesDataset.write \
+    names_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode('append') \
-        .options(table="movies", keyspace="movielens") \
+        .options(table="names", keyspace="movielens") \
         .save()
 
     # Read data back from Cassandra
-    usersDF = spark.read \
+    readUsers = spark.read \
         .format("org.apache.spark.sql.cassandra") \
         .options(table="users", keyspace="movielens") \
         .load()
 
-    ratingsDF = spark.read \
+    readRatings = spark.read \
         .format("org.apache.spark.sql.cassandra") \
         .options(table="ratings", keyspace="movielens") \
         .load()
 
-    moviesDF = spark.read \
+    readNames = spark.read \
         .format("org.apache.spark.sql.cassandra") \
-        .options(table="movies", keyspace="movielens") \
+        .options(table="names", keyspace="movielens") \
         .load()
 
+    readUsers.createOrReplaceTempView("users")
+    readRatings.createOrReplaceTempView("ratings")
+    readNames.createOrReplaceTempView("names")
+
     # Calculate average rating for each movie
-    avg_ratingsDF = ratingsDF.groupBy("movie_id").agg(F.avg("rating").alias("average_rating"))
+    avg_rating = spark.sql("""
+        SELECT n.title, AVG(r.rating) AS avgRating 
+        FROM ratings r
+        JOIN names n ON r.movie_id = n.movie_id
+        GROUP BY n.title
+    """)
 
-    # Find the top ten highest average ratings
-    top_ten_moviesDF = avg_ratingsDF.orderBy(F.desc("average_rating")).limit(10)
+    print("Average Rating for each Movie")
+    avg_rating.show(10)
 
-    # Find users who have rated at least 50 movies and their favorite movie genres
-    user_ratings_countDF = ratingsDF.groupBy("user_id").count().alias("movie_count")
-    active_usersDF = user_ratings_countDF.filter(user_ratings_countDF['count'] >= 50)
-    favorite_genresDF = ratingsDF.join(moviesDF, "movie_id") \
-        .groupBy("user_id", "genres").count() \
-        .orderBy("user_id", F.desc("count"))
+    # Find the top ten movies with the highest average ratings.
+    top_ten_highest = spark.sql("""
+        SELECT n.title, AVG(r.rating) AS avgRating, COUNT(*) as rated_count
+        FROM ratings r
+        JOIN names n ON r.movie_id = n.movie_id
+        GROUP BY n.title
+        HAVING rated_count > 10
+        ORDER BY avgRating DESC
+        LIMIT 10
+    """)
 
-    # Find users under 20 years old
-    young_usersDF = usersDF.filter(usersDF.age < 20)
+    print("Top 10 Movies with Highest Average Rating with More than 10 being Rated")
+    top_ten_highest.show(10)
 
-    # Find users who are scientists and aged between 30 and 40
-    scientist_usersDF = usersDF.filter((usersDF.occupation == "scientist") & (usersDF.age.between(30, 40)))
+    # Find the users who have rated at least 50 movies and identify their favourite movie genres
+    user_rating = spark.sql("""
+        SELECT user_id, COUNT(movie_id) AS rated_count
+        FROM ratings
+        GROUP BY user_id
+        HAVING COUNT(movie_id) >= 50
+        ORDER BY user_id ASC
+    """)
 
-    # Display results
-    avg_ratingsDF.show()
-    top_ten_moviesDF.show()
-    favorite_genresDF.show()
-    young_usersDF.show()
-    scientist_usersDF.show()
+    print("Table Users have Rated at least 50 Movies")
+    user_rating.show(10)
 
+    user_rating.createOrReplaceTempView("user_rating")
+
+    user_genre = spark.sql("""
+        SELECT
+            r.user_id,
+            CASE
+                WHEN n.action = 1 THEN 'Action'
+                WHEN n.adventure = 1 THEN 'Adventure'
+                WHEN n.animation = 1 THEN 'Animation'
+                WHEN n.children = 1 THEN 'Children'
+                WHEN n.comedy = 1 THEN 'Comedy'
+                WHEN n.crime = 1 THEN 'Crime'
+                WHEN n.documentary = 1 THEN 'Documentary'
+                WHEN n.drama = 1 THEN 'Drama'
+                WHEN n.fantasy = 1 THEN 'Fantasy'
+                WHEN n.film_noir = 1 THEN 'Film-Noir'
+                WHEN n.horror = 1 THEN 'Horror'
+                WHEN n.musical = 1 THEN 'Musical'
+                WHEN n.mystery = 1 THEN 'Mystery'
+                WHEN n.romance = 1 THEN 'Romance'
+                WHEN n.sci_fi = 1 THEN 'Sci-Fi'
+                WHEN n.thriller = 1 THEN 'Thriller'
+                WHEN n.war = 1 THEN 'War'
+                WHEN n.western = 1 THEN 'Western'
+                ELSE 'Unknown'
+            END AS genre,
+            SUM(r.rating) AS total_rating
+        FROM ratings r
+        JOIN names n ON r.movie_id = n.movie_id
+        JOIN user_rating u ON r.user_id = u.user_id
+        GROUP BY r.user_id, genre
+        ORDER BY user_id ASC
+    """)
+
+    user_genre.createOrReplaceTempView("user_genre")
+
+    fav_genre = spark.sql("""
+        SELECT user_id, genre, total_rating
+        FROM (
+            SELECT user_id, genre, total_rating,
+                   ROW_NUMBER() OVER(PARTITION BY user_id ORDER BY total_rating DESC) AS row_num
+            FROM user_genre
+        ) AS ranked_genres
+        WHERE row_num = 1
+        ORDER BY user_id
+    """)
+
+    print("User's Favourite Genre")
+    fav_genre.show(10)
+
+    # All users that are less than 20 years old
+    young_user = spark.sql("SELECT * FROM users WHERE age < 20")
+    print("Users less than 20 years old")
+    young_user.show(10)
+
+    # All the users who have the occupation scientist and their age is between 30 and 40 years old
+    scientist = spark.sql("SELECT * FROM users WHERE occupation = 'scientist' AND age BETWEEN 30 AND 40")
+    print("Scientists aged between 30 and 40")
+    scientist.show(10)
+
+    # Display all tables
+    print("Average Rating for Movies")
+    avg_rating.show(10)
+    print("Movies with Highest Average Rating")
+    top_ten_highest.show(10)
+    print("Users who have Rated at least 50 Movies")
+    user_rating.show(10)
+    print("Users less than 20 years old")
+    young_user.show(10)
+    print("Scientists aged between 30 and 40")
+    scientist.show(10)
+
+    # Stop spark session
     spark.stop()
 ```
 Output:
 ### 1) Calculate the average rating for each movie.
 
-Table below shows the top 20 rows for average rating for each movie.
+Table below shows average rating for each movie.
 
-|movie_id|    average_rating|
-|--------|------------------|
-|     471|3.6108597285067874|
-|     496| 4.121212121212121|
-|     148|          3.203125|
-|     833| 3.204081632653061|
-|     463| 3.859154929577465|
-|    1088| 2.230769230769231|
-|    1591|3.1666666666666665|
-|    1238|             3.125|
-|    1645|               4.0|
-|    1580|               1.0|
-|    1342|               2.5|
-|    1522|2.4285714285714284|
-|     540| 2.511627906976744|
-|     243|2.4393939393939394|
-|    1084| 3.857142857142857|
-|    1025|2.9318181818181817|
-|     392|3.5441176470588234|
-|     623| 2.923076923076923|
-|     737| 2.983050847457627|
-|    1483|3.4166666666666665|
+|               title|         avgRating|
+|--------------------|------------------|
+|   Annie Hall (1977)| 3.911111111111111|
+|Snow White and th...|3.7093023255813953|
+|Paris, France (1993)|2.3333333333333335|
+| If Lucy Fell (1996)|2.7586206896551726|
+|    Fair Game (1995)|2.1818181818181817|
+|Heavenly Creature...|3.6714285714285713|
+|Night of the Livi...|          3.421875|
+|         Cosi (1996)|               4.0|
+| Three Wishes (1995)|3.2222222222222223|
+|When We Were King...| 4.045454545454546|
 
 ### 2) Identify the top ten movies with the highest average ratings  
 
-|movie_id|average_rating|
-|--------|--------------|
-|    1599|           5.0|
-|    1293|           5.0|
-|    1653|           5.0|
-|    1201|           5.0|
-|    1189|           5.0|
-|    1467|           5.0|
-|    1122|           5.0|
-|    1500|           5.0|
-|    1536|           5.0|
-|     814|           5.0|
+|               title|         avgRating|rated_count|
+|--------------------|------------------|-----------|
+|Close Shave, A (1...| 4.491071428571429|        112|
+|Schindler's List ...| 4.466442953020135|        298|
+|Wrong Trousers, T...| 4.466101694915254|        118|
+|   Casablanca (1942)|  4.45679012345679|        243|
+|Wallace & Gromit:...| 4.447761194029851|         67|
+|Shawshank Redempt...| 4.445229681978798|        283|
+|  Rear Window (1954)|4.3875598086124405|        209|
+|Usual Suspects, T...| 4.385767790262173|        267|
+|    Star Wars (1977)|4.3584905660377355|        583|
+| 12 Angry Men (1957)|             4.344|        125|
 
-🔶 Insights: The table above shows top 10 movies with highesr average ratings.
+🔶 Insights: The table above shows top 10 movies with highest average ratings.
 
 ### 3) Find the users who have rated at least 50 movies and identify their favourite movie genres.
 
 
-|user_id|              genres|count|
-|-------|--------------------|-----|
-|      1|[0, 0, 0, 0, 0, 0...|   39|
-|      1|[0, 0, 0, 0, 0, 1...|   24|
-|      1|[0, 0, 0, 0, 0, 1...|   13|
-|      1|[0, 0, 0, 0, 0, 0...|   11|
-|      1|[0, 0, 0, 0, 1, 1...|    8|
-|      1|[0, 1, 1, 0, 0, 0...|    7|
-|      1|[0, 1, 0, 0, 0, 0...|    7|
-|      1|[0, 0, 0, 0, 0, 1...|    7|
-|      1|[0, 0, 0, 0, 0, 0...|    7|
-|      1|[0, 0, 0, 0, 0, 0...|    6|
-|      1|[0, 0, 0, 0, 0, 0...|    5|
-|      1|[0, 0, 0, 0, 0, 1...|    4|
-|      1|[0, 1, 1, 0, 0, 0...|    4|
-|      1|[0, 0, 0, 0, 0, 0...|    3|
-|      1|[0, 0, 0, 0, 0, 1...|    3|
-|      1|[0, 0, 0, 0, 0, 0...|    3|
-|      1|[0, 1, 1, 0, 0, 0...|    3|
-|      1|[0, 0, 0, 0, 0, 0...|    3|
-|      1|[0, 1, 0, 0, 0, 0...|    3|
-|      1|[0, 1, 0, 0, 0, 0...|    3|
-
-only showing top 20 rows
+|user_id|rated_count|
+|-------|-----------|
+|      1|        272|
+|      2|         62|
+|      3|         54|
+|      5|        175|
+|      6|        211|
+|      7|        403|
+|      8|         59|
+|     10|        184|
+|     11|        181|
+|     12|         51|
 
 🔶 Insights: The table above shows the user with minimum rated atleast 50 movies. 
-The table also indicates the genres 0 and 1 which represent for Unkown and Action movies respectively.  
+
 
 ### 4) Find all the users with age that is less than 20 years old.
 
@@ -307,20 +402,8 @@ The table also indicates the genres 0 and 1 which represent for Unkown and Actio
 |    674| 13|     F|      student|55337|
 |    375| 17|     M|entertainment|37777|
 |    851| 18|     M|        other|29646|
-|    859| 18|     F|        other|06492|
-|    813| 14|     F|      student|02136|
-|     52| 18|     F|      student|55105|
-|    397| 17|     M|      student|27514|
-|    257| 17|     M|      student|77005|
-|    221| 19|     M|      student|20685|
-|    368| 18|     M|      student|92113|
-|    507| 18|     F|       writer|28450|
-|    262| 19|     F|      student|78264|
-|    880| 13|     M|      student|83702|
 
-only showing top 20 rows
-
-🔶 Insights: Table above shows top 20 rows of users below the age 20 years old.
+🔶 Insights: Table above shows 10 rows of users below the age 20 years old.
 
 ### 5) Find all the users who have the occupation “scientist” and their age is between 30 and 40 years old.
 
@@ -337,15 +420,10 @@ only showing top 20 rows
 |     71| 39|     M| scientist|98034|
 |    643| 39|     M| scientist|55122|
 |    543| 33|     M| scientist|95123|
-|    730| 31|     F| scientist|32114|
-|     74| 39|     M| scientist|T8H1N|
-|    272| 33|     M| scientist|53706|
-|    430| 38|     M| scientist|98199|
-|    874| 36|     M| scientist|37076|
-|    309| 40|     M| scientist|70802|
 
 
-🔶 Insights: From the dataset, the output gives us 16 scientist between the age 30 till 40 years old.
+
+🔶 Insights: From the dataset, the output gives us the 10 list scientist between the age 30 till 40 years old.
 
 ## Recommendations
 
