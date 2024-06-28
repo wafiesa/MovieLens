@@ -255,9 +255,6 @@ if __name__ == "__main__":
         ORDER BY user_id ASC
     """)
 
-    print("Table Users have Rated at least 50 Movies")
-    user_rating.show(10)
-
     user_rating.createOrReplaceTempView("user_rating")
 
     user_genre = spark.sql("""
@@ -318,18 +315,6 @@ if __name__ == "__main__":
     print("Scientists aged between 30 and 40")
     scientist.show(10)
 
-    # Display all tables
-    print("Average Rating for Movies")
-    avg_rating.show(10)
-    print("Movies with Highest Average Rating")
-    top_ten_highest.show(10)
-    print("Users who have Rated at least 50 Movies")
-    user_rating.show(10)
-    print("Users less than 20 years old")
-    young_user.show(10)
-    print("Scientists aged between 30 and 40")
-    scientist.show(10)
-
     # Stop spark session
     spark.stop()
 ```
@@ -371,20 +356,20 @@ Table below shows average rating for each movie.
 ### 3) Find the users who have rated at least 50 movies and identify their favourite movie genres.
 
 
-|user_id|rated_count|
-|-------|-----------|
-|      1|        272|
-|      2|         62|
-|      3|         54|
-|      5|        175|
-|      6|        211|
-|      7|        403|
-|      8|         59|
-|     10|        184|
-|     11|        181|
-|     12|         51|
+|user_id| genre|total_rating|
+|-------|------|------------|
+|      1| Drama|         297|
+|      2| Drama|         100|
+|      3|Action|          39|
+|      5|Action|         176|
+|      6| Drama|         292|
+|      7| Drama|         442|
+|      8|Action|         159|
+|     10| Drama|         259|
+|     11|Comedy|         223|
+|     12| Drama|          74|
 
-🔶 Insights: The table above shows the user with minimum rated atleast 50 movies. 
+🔶 Insights: The table above shows the users with minimum rated atleast 50 movies and its genres. 
 
 
 ### 4) Find all the users with age that is less than 20 years old.
